@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { MovieFact, MovieFactSkeleton } from "@/components/movie-fact";
 import { UserAvatar } from "@/components/user-avatar";
 import { signOut } from "@/lib/auth";
 import { getCurrentUser } from "@/lib/current-user";
@@ -41,6 +43,11 @@ export default async function DashboardPage() {
             {user.favoriteMovie}
           </p>
         </div>
+
+        {/* The page shows instantly; the fact streams in when OpenAI answers. */}
+        <Suspense fallback={<MovieFactSkeleton />}>
+          <MovieFact userId={user.id} />
+        </Suspense>
 
         <form action={logout} className="mt-6">
           <button
