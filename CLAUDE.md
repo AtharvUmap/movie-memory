@@ -5,7 +5,9 @@ The plan lives in `TICKETS.md`. Work **one ticket at a time** and don't work ahe
 
 ## Stack
 
-- Next.js (App Router) + TypeScript (`strict: true`)
+- Next.js 16 (App Router, Cache Components enabled) + TypeScript (`strict: true`).
+  APIs differ from older Next versions: check `node_modules/next/dist/docs/` (see `AGENTS.md`).
+- Vitest (`npm test`), ESLint + Prettier, Postgres 16 via `docker-compose.yml`
 - Tailwind CSS
 - Prisma ORM + PostgreSQL
 - Auth.js (NextAuth v5) with the Google provider and the Prisma adapter
