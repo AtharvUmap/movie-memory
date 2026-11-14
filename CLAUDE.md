@@ -9,7 +9,10 @@ The plan lives in `TICKETS.md`. Work **one ticket at a time** and don't work ahe
   APIs differ from older Next versions: check `node_modules/next/dist/docs/` (see `AGENTS.md`).
 - Vitest (`npm test`), ESLint + Prettier, Postgres 16 via `docker-compose.yml`
 - Tailwind CSS
-- Prisma ORM + PostgreSQL
+- Prisma 7 ORM + PostgreSQL (driver adapter `@prisma/adapter-pg`). Import the client from
+  `@/lib/generated/prisma/client` (git-ignored, built by `postinstall`). Use `prisma` from
+  `lib/db.ts`, never `new PrismaClient()`. After schema changes: `npx prisma migrate dev`, then
+  `npx prisma generate` (Prisma 7's `migrate dev` no longer generates the client).
 - Auth.js (NextAuth v5) with the Google provider and the Prisma adapter
 - OpenAI SDK (`openai` package) for fact generation
 

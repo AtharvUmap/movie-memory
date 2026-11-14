@@ -43,3 +43,5 @@ next-env.d.ts
 
 # private study notes — never commit
 notes/
+
+/lib/generated/prisma
