@@ -43,6 +43,15 @@ components/   UI components
 tests/        Vitest tests
 ```
 
+## Testing
+
+- `npm test` needs the Docker Postgres running. Tests use `movie_memory_test` (`.env.test`), never the dev DB.
+  The global setup runs `prisma migrate reset --force` on the test DB; when an AI agent runs it, Prisma
+  requires the user's explicit consent (`PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION`).
+- Fake only the generator (`getOrCreateFact(userId, { now, generate })`); don't mock Prisma.
+- Manual checks against the dev DB: use dedicated test user ids and delete only those
+  (`DELETE FROM "User" WHERE id = '...'` cascades). Never run unscoped deletes on the dev DB.
+
 ## Documentation rule
 
 After every ticket, write or update the private study notes in `notes/`:

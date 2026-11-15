@@ -49,6 +49,31 @@ openssl rand -base64 32     # paste into AUTH_SECRET in .env
   - **Why this over the alternative** (a `FactGeneration` row with a unique `(userId, windowStart)` and polling for the winner): the lock needs no schema change and no polling loop, works across server instances because Postgres coordinates it, and can't leave a stuck "in progress" row behind if a request crashes.
   - **Tradeoffs:** the OpenAI call runs while the lock is held, so same-user requests wait for it (transaction timeout 30s, above the ~21s worst case of 10s × 2 attempts). Each waiting request holds a DB connection while blocked. When OpenAI is failing, waiters don't benefit (each retries in turn).
 
+## Tests
+
+```bash
+docker compose up -d --wait   # tests need the local Postgres
+npm test
+```
+
+- **Real database, no Prisma mocks.** Tests run against a separate database, `movie_memory_test` (`.env.test`, committed because it holds only local Docker credentials). A Vitest global setup (`tests/support/global-setup.ts`) runs `prisma migrate reset --force` once per run, and refuses any database whose name doesn't end in `_test`, so it can never wipe the dev DB. Each test empties the tables first. Test files run one at a time because they share the database.
+- **Only the generator is faked.** `getOrCreateFact` takes `{ now, generate }`, so tests pass a fixed clock and a fake generator instead of calling OpenAI.
+- `server-only` is aliased to an empty module in tests only (it throws outside Next's server environment).
+
+| #   | Test (`tests/facts.test.ts`, `tests/api-fact.test.ts`)                                                                  | Proves                                                   |
+| --- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| 1   | No fact → generates and stores one                                                                                      | basic path; row has `userId`, `movie`, `createdAt = now` |
+| 2   | Fact 30s old → cached, generator not called                                                                             | 60s cache hit                                            |
+| 3   | Fact 61s old → new fact (plus: exactly 60s counts as expired)                                                           | cache expiry boundary                                    |
+| 4   | Recent fact for a different movie → new fact                                                                            | changing movie invalidates                               |
+| 5   | Generator throws + old fact → newest old fact as `stale`                                                                | graceful degradation, nothing written                    |
+| 6   | Generator throws + no fact (other movie's fact ignored) → `FactUnavailableError`                                        | typed failure                                            |
+| 7   | 5 parallel calls → generator called once, 1 row, 1 `fresh` + 4 `cache`                                                  | advisory lock works (fails if the lock is removed)       |
+| 8   | User B never gets user A's fact (fresh or stale); `GET /api/fact` without session → 401; signed in as B → B's fact only | authorization / data isolation                           |
+| —   | API: stale → 200; unavailable → 502 with a generic message (no upstream text)                                           | error mapping, no leaks                                  |
+
+Plus unit tests for the movie-title schema (`tests/validation.test.ts`) and display fallbacks (`tests/display.test.ts`): **35 tests total**.
+
 ## Security & correctness audit
 
 _Draft, written during the T8 hardening pass._
@@ -84,5 +109,5 @@ _Draft, written during the T8 hardening pass._
 
 - User-provided text (names, movie titles, AI output) is rendered by React as escaped text. Verified with `<script>` and `onerror` payloads.
 - `next/image` only fetches from `lh3.googleusercontent.com`; other hosts get a 400.
-- `npm run lint`, `npm run typecheck` and `npm test` pass.
+- `npm run lint`, `npm run typecheck` and `npm test` (35 tests) pass.
 - `npm audit --omit=dev`: 0 vulnerabilities. There are 7 moderate advisories in dev-only ESLint tooling (`@typescript-eslint` → `minimatch`). `npm audit fix` can't resolve them within `eslint-config-next`'s version range, and none of that code ships to production.
