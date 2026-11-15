@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { auth } from "@/lib/auth";
-import { getOrCreateFact } from "@/lib/facts";
+import { FactUnavailableError, getOrCreateFact } from "@/lib/facts";
 
 // Per-user data: never let a browser or proxy cache it.
 const noStore = { "Cache-Control": "no-store" };
@@ -19,13 +19,21 @@ export async function GET() {
 
   try {
     // The user id comes from the session; this route takes no parameters.
+    // A "stale" fact is still a 200: the client gets a usable fact plus `source`.
     const { fact, source } = await getOrCreateFact(session.user.id);
     return Response.json({ ...fact, source }, { headers: noStore });
   } catch (error) {
+    if (error instanceof FactUnavailableError) {
+      // Upstream (OpenAI) failed and there's nothing to fall back on; already logged.
+      return Response.json(
+        { error: "Couldn't get a fact right now" },
+        { status: 502, headers: noStore },
+      );
+    }
     console.error("GET /api/fact failed", error);
     return Response.json(
-      { error: "Couldn't get a fact right now" },
-      { status: 502, headers: noStore },
+      { error: "Something went wrong" },
+      { status: 500, headers: noStore },
     );
   }
 }
