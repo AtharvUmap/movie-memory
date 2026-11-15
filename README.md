@@ -41,6 +41,14 @@ openssl rand -base64 32     # paste into AUTH_SECRET in .env
 | `npm run typecheck` | Generate Next route types, then `tsc`       |
 | `npm run format`    | Format with Prettier (`format:check` in CI) |
 
+## Fact caching & concurrency
+
+- **60-second cache:** `getOrCreateFact` (`lib/facts.ts`) reuses the newest fact for the user's current movie if it's younger than `FACT_TTL_MS` (60s). The `Fact` table is the cache: one indexed lookup, no extra infrastructure, shared by every server instance.
+- **Burst protection (Postgres advisory lock):** on a cache miss, generation runs in a transaction that first takes `pg_advisory_xact_lock(1, hashtext(userId))`. Concurrent requests for the _same user_ queue on the lock, re-check the cache once they get it, and reuse the fact the first request stored. Other users have different lock keys and are unaffected. The lock is released automatically on commit or rollback.
+  - Measured with 10 parallel requests and a 2s fake generator: without the lock, **10** OpenAI calls and 10 rows. With the lock, **1** call and **1** row (30 parallel: also 1 and 1). Two different users at once finish in ~2s, not ~4s.
+  - **Why this over the alternative** (a `FactGeneration` row with a unique `(userId, windowStart)` and polling for the winner): the lock needs no schema change and no polling loop, works across server instances because Postgres coordinates it, and can't leave a stuck "in progress" row behind if a request crashes.
+  - **Tradeoffs:** the OpenAI call runs while the lock is held, so same-user requests wait for it (transaction timeout 30s, above the ~21s worst case of 10s × 2 attempts). Each waiting request holds a DB connection while blocked. When OpenAI is failing, waiters don't benefit (each retries in turn).
+
 ## Security & correctness audit
 
 _Draft, written during the T8 hardening pass._
