@@ -1,4 +1,4 @@
-import { getFactForUser } from "@/lib/facts";
+import { getOrCreateFact } from "@/lib/facts";
 
 const cardClass =
   "mt-6 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800";
@@ -9,7 +9,7 @@ const labelClass =
 export async function MovieFact({ userId }: { userId: string }) {
   let fact;
   try {
-    fact = await getFactForUser(userId);
+    ({ fact } = await getOrCreateFact(userId));
   } catch (error) {
     // Log the real reason on the server; show the user something friendly only.
     console.error("Fact generation failed", error);
