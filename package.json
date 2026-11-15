@@ -19,7 +19,7 @@
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "next": "16.4.6",
-    "next-auth": "^5.0.0-beta.32",
+    "next-auth": "5.0.0-beta.32",
     "openai": "^7.57.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
